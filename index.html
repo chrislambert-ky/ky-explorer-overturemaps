@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KY Overture Explorer</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <!-- CodeMirror 5 -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css" rel="stylesheet" />
+  <!-- Leaflet -->
+  <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" rel="stylesheet" />
+  <!-- Custom styles -->
+  <link href="css/app.css" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ── NAVBAR ────────────────────────────────────────────────────────────── -->
+<nav class="navbar bg-white border-bottom px-3 py-2 d-flex align-items-center gap-3 shadow-sm">
+  <span class="navbar-brand mb-0 fw-bold text-primary fs-5">
+    <i class="bi bi-map-fill me-2"></i>KY Overture Explorer
+  </span>
+
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <span id="duckdb-status" class="badge bg-secondary d-flex align-items-center gap-1">
+      <span class="spinner-grow spinner-grow-sm" role="status"></span>Initializing…
+    </span>
+    <span id="spatial-status" class="badge bg-secondary d-none">Spatial</span>
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#settingsModal">
+      <i class="bi bi-gear-fill"></i>
+    </button>
+    <a href="https://github.com/nikmarch/overturemaps-duckdb" target="_blank"
+       class="btn btn-sm btn-outline-secondary" title="Reference project">
+      <i class="bi bi-github"></i>
+    </a>
+  </div>
+</nav>
+
+<!-- ── MAIN LAYOUT: sidebar + content area ──────────────────────────────── -->
+<div class="d-flex" style="height: calc(100vh - 52px); overflow: hidden;">
+
+  <!-- LEFT SIDEBAR ─────────────────────────────────────────────────────── -->
+  <aside id="sidebar" class="border-end d-flex flex-column" style="width:310px;min-width:260px;overflow-y:auto;">
+
+    <!-- CORS Proxy alert (shown when proxy is not set) -->
+    <div id="cors-alert" class="alert alert-warning alert-sm m-2 mb-0 py-2 px-3 d-none" role="alert" style="font-size:.8rem;">
+      <i class="bi bi-exclamation-triangle-fill me-1"></i>
+      CORS proxy not configured. S3 access may fail.
+      <a href="#" id="cors-alert-link" class="alert-link" data-bs-toggle="modal" data-bs-target="#settingsModal">Configure.</a>
+    </div>
+
+    <div class="p-3 d-flex flex-column gap-3 flex-grow-1">
+
+      <!-- ── Data Source ─────────────────────────────────────────────── -->
+      <div>
+        <label class="sidebar-section-label">
+          <i class="bi bi-cloud-download me-1"></i>Data Source
+        </label>
+        <div class="mb-2">
+          <label class="form-label form-label-sm">Overture Release</label>
+          <select id="release-select" class="form-select form-select-sm">
+            <option value="2026-03-18.0" selected>2026-03-18.0 (Latest)</option>
+            <option value="2026-02-18.0">2026-02-18.0</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ── Dataset ─────────────────────────────────────────────────── -->
+      <div>
+        <label class="sidebar-section-label">
+          <i class="bi bi-layers me-1"></i>Dataset
+        </label>
+        <div class="mb-2">
+          <label class="form-label form-label-sm">Theme</label>
+          <select id="theme-select" class="form-select form-select-sm"></select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label form-label-sm">Type</label>
+          <select id="type-select" class="form-select form-select-sm"></select>
+          <div id="type-description" class="form-text text-muted mt-1" style="font-size:.72rem;"></div>
+        </div>
+      </div>
+
+      <!-- ── Spatial Filter ──────────────────────────────────────────── -->
+      <div>
+        <label class="sidebar-section-label">
+          <i class="bi bi-bounding-box me-1"></i>Spatial Filter (BBox)
+        </label>
+        <div class="mb-2">
+          <select id="bbox-preset" class="form-select form-select-sm mb-2">
+            <option value="">— Common Regions —</option>
+            <optgroup label="Kentucky — Cities">
+              <option value="-85.82,37.98,-85.59,38.19">Louisville, KY</option>
+              <option value="-84.58,37.97,-84.44,38.10">Lexington, KY</option>
+              <option value="-84.56,38.98,-84.38,39.13">Covington / Newport, KY</option>
+              <option value="-87.17,37.68,-87.04,37.80">Owensboro, KY</option>
+              <option value="-86.52,36.97,-86.38,37.08">Bowling Green, KY</option>
+              <option value="-82.65,38.37,-82.54,38.46">Ashland, KY</option>
+              <option value="-83.96,36.73,-83.82,36.83">Corbin, KY</option>
+              <option value="-84.30,36.56,-84.17,36.68">Middlesboro, KY</option>
+              <option value="-83.16,37.69,-83.01,37.80">Hazard, KY</option>
+              <option value="-86.79,37.00,-86.65,37.11">Elizabethtown, KY</option>
+              <option value="-84.75,38.27,-84.64,38.36">Georgetown, KY</option>
+              <option value="-87.50,37.37,-87.40,37.45">Henderson, KY</option>
+            </optgroup>
+            <optgroup label="Kentucky — Regions">
+              <option value="-89.57,36.49,-81.96,39.15">Entire Kentucky</option>
+              <option value="-87.60,36.49,-84.00,38.00">Western KY</option>
+              <option value="-84.00,36.49,-81.96,38.00">Eastern KY (Appalachia)</option>
+              <option value="-85.90,37.70,-83.80,38.80">Bluegrass Region</option>
+              <option value="-86.00,36.49,-83.50,37.20">South-Central KY</option>
+            </optgroup>
+            <optgroup label="Nearby — Metro Areas">
+              <option value="-87.94,41.64,-87.52,42.02">Cincinnati, OH</option>
+              <option value="-87.07,39.62,-86.62,40.01">Indianapolis, IN</option>
+              <option value="-90.37,35.96,-89.77,35.23">Memphis, TN</option>
+              <option value="-87.05,36.00,-86.55,36.40">Nashville, TN</option>
+              <option value="-84.56,33.64,-84.29,33.89">Atlanta, GA</option>
+              <option value="-83.13,39.87,-82.82,40.10">Columbus, OH</option>
+              <option value="-85.92,40.32,-85.61,40.53">Muncie, IN</option>
+            </optgroup>
+            <optgroup label="World">
+              <option value="-180,-90,180,90">Entire World ⚠️ Very Large</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="row g-1">
+          <div class="col-6">
+            <label class="form-label form-label-sm">X Min (West)</label>
+            <input type="number" id="bbox-xmin" class="form-control form-control-sm" placeholder="-118.67" step="0.001" />
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm">X Max (East)</label>
+            <input type="number" id="bbox-xmax" class="form-control form-control-sm" placeholder="-118.15" step="0.001" />
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm">Y Min (South)</label>
+            <input type="number" id="bbox-ymin" class="form-control form-control-sm" placeholder="33.70" step="0.001" />
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm">Y Max (North)</label>
+            <input type="number" id="bbox-ymax" class="form-control form-control-sm" placeholder="34.34" step="0.001" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Options ─────────────────────────────────────────────────── -->
+      <div>
+        <label class="sidebar-section-label">
+          <i class="bi bi-sliders me-1"></i>Options
+        </label>
+        <div class="mb-2">
+          <label class="form-label form-label-sm d-flex justify-content-between">
+            Row Limit
+            <span id="limit-value" class="text-info fw-bold">10,000</span>
+          </label>
+          <input type="range" id="limit-slider" class="form-range" min="100" max="500000"
+                 step="100" value="10000" />
+          <div class="d-flex justify-content-between" style="font-size:.7rem;color:#666;">
+            <span>100</span><span>500K</span>
+          </div>
+        </div>
+        <div class="form-check form-switch mb-1">
+          <input class="form-check-input" type="checkbox" id="load-spatial" checked />
+          <label class="form-check-label form-label-sm" for="load-spatial">Load Spatial Extension</label>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="add-wkt" />
+          <label class="form-check-label form-label-sm" for="add-wkt">Include WKT geometry column</label>
+        </div>
+      </div>
+
+      <!-- ── Generated URL preview ───────────────────────────────────── -->
+      <div>
+        <label class="sidebar-section-label">
+          <i class="bi bi-link-45deg me-1"></i>Parquet URL
+        </label>
+        <div id="url-preview" class="url-preview-box text-truncate" title=""></div>
+      </div>
+
+      <!-- ── Load Button ─────────────────────────────────────────────── -->
+      <div class="mt-auto pt-2">
+        <button id="load-btn" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+          <i class="bi bi-cloud-download-fill"></i>Load Dataset
+        </button>
+        <div id="load-progress" class="d-none mt-2">
+          <div class="progress" style="height:4px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary w-100"></div>
+          </div>
+          <div id="load-status" class="text-center mt-1" style="font-size:.75rem;color:#aaa;"></div>
+        </div>
+      </div>
+
+      <!-- ── Schema Explorer ─────────────────────────────────────────── -->
+      <div id="schema-section" class="d-none">
+        <label class="sidebar-section-label">
+          <i class="bi bi-diagram-3 me-1"></i>Loaded Tables
+        </label>
+        <div id="schema-tree" class="schema-tree"></div>
+      </div>
+
+    </div><!-- /p-3 -->
+  </aside>
+
+  <!-- RIGHT CONTENT AREA ───────────────────────────────────────────────── -->
+  <main class="flex-grow-1 d-flex flex-column overflow-hidden">
+
+    <!-- Tab nav -->
+    <ul class="nav nav-tabs nav-tabs-app px-3 pt-2 flex-shrink-0 border-bottom" id="main-tabs">
+      <li class="nav-item">
+        <a class="nav-link active" id="tab-results" href="#" data-tab="results">
+          <i class="bi bi-table me-1"></i>Results
+          <span id="results-badge" class="badge bg-secondary ms-1 d-none"></span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="tab-sql" href="#" data-tab="sql">
+          <i class="bi bi-terminal me-1"></i>SQL Editor
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="tab-map" href="#" data-tab="map">
+          <i class="bi bi-geo-alt me-1"></i>Map Preview
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="tab-export" href="#" data-tab="export">
+          <i class="bi bi-box-arrow-up me-1"></i>Export &amp; Convert
+        </a>
+      </li>
+    </ul>
+
+    <!-- ── RESULTS TAB ─────────────────────────────────────────────────── -->
+    <div id="pane-results" class="tab-pane flex-grow-1 d-flex flex-column overflow-hidden p-0">
+
+      <div class="results-toolbar d-flex align-items-center gap-2 px-3 py-2 border-bottom flex-shrink-0">
+        <span id="result-info" class="text-muted small">No data loaded</span>
+        <div class="ms-auto d-flex gap-2">
+          <button id="copy-results-btn" class="btn btn-sm btn-outline-secondary d-none" title="Copy as CSV">
+            <i class="bi bi-clipboard"></i>
+          </button>
+          <div id="result-pagination" class="d-flex align-items-center gap-1 d-none">
+            <button id="prev-page" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <span id="page-info" class="small text-muted px-1"></span>
+            <button id="next-page" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="results-empty" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted">
+        <i class="bi bi-cloud-download" style="font-size:3rem;opacity:.3;"></i>
+        <p class="mt-2 mb-0">Select a dataset in the sidebar and click <strong>Load Dataset</strong></p>
+        <p class="small">or write a query in the <a href="#" id="goto-sql-link">SQL Editor</a></p>
+      </div>
+
+      <div id="results-error" class="d-none flex-grow-1 overflow-auto p-3">
+        <div class="alert alert-danger">
+          <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Error</h6>
+          <pre id="error-message" class="mb-2" style="white-space:pre-wrap;font-size:.8rem;"></pre>
+          <div id="error-cors-hint" class="d-none">
+            <hr class="my-2" />
+            <p class="mb-1 small"><strong>This looks like a CORS error.</strong> The Overture Maps S3 bucket requires a proxy for browser access.</p>
+            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#settingsModal">
+              <i class="bi bi-gear-fill me-1"></i>Configure CORS Proxy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="results-table-wrap" class="d-none flex-grow-1 overflow-auto">
+        <table id="results-table" class="table table-sm table-hover table-bordered mb-0 results-tbl">
+          <thead id="results-thead" class="sticky-top"></thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- ── SQL EDITOR TAB ──────────────────────────────────────────────── -->
+    <div id="pane-sql" class="tab-pane flex-grow-1 d-flex flex-column overflow-hidden d-none">
+
+      <!-- SQL toolbar -->
+      <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom flex-shrink-0">
+        <button id="sql-run-btn" class="btn btn-sm btn-success d-flex align-items-center gap-1">
+          <i class="bi bi-play-fill"></i>Run <kbd class="ms-1" style="font-size:.65rem;">Ctrl+↵</kbd>
+        </button>
+        <button id="sql-clear-btn" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </button>
+        <button id="sql-format-btn" class="btn btn-sm btn-outline-secondary" title="Insert sample query">
+          <i class="bi bi-lightning-fill me-1"></i>Samples
+        </button>
+        <div class="vr"></div>
+        <select id="sql-history-select" class="form-select form-select-sm" style="width:auto;max-width:260px;">
+          <option value="">— Query History —</option>
+        </select>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <span id="sql-exec-time" class="small text-muted"></span>
+          <span id="sql-row-count" class="badge bg-secondary d-none"></span>
+        </div>
+      </div>
+
+      <!-- Sample queries dropdown menu (hidden by default) -->
+      <div id="samples-menu" class="samples-menu d-none">
+        <div class="list-group list-group-flush">
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- List all tables loaded in DuckDB\nSHOW TABLES;">
+            Show loaded tables
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Query places around Los Angeles\nSELECT\n  id,\n  names.primary AS name,\n  categories.primary AS category,\n  confidence,\n  bbox.xmin, bbox.ymin\nFROM read_parquet('{{PARQUET_URL}}')\nWHERE bbox.xmin >= -118.67 AND bbox.xmax <= -118.15\n  AND bbox.ymin >= 33.70  AND bbox.ymax <= 34.34\nLIMIT 1000;">
+            Load LA places (requires proxy)
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Describe the columns of the loaded table\nDESCRIBE explorer_result;">
+            Describe explorer_result table
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Count rows in loaded table\nSELECT COUNT(*) as row_count FROM explorer_result;">
+            Count rows
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Category breakdown for places\nSELECT\n  categories.primary AS category,\n  COUNT(*) AS count\nFROM explorer_result\nGROUP BY category\nORDER BY count DESC\nLIMIT 50;">
+            Category breakdown
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Convert WKB geometry to WKT text\nSELECT id, names.primary AS name, ST_AsText(geometry) AS geom_wkt\nFROM explorer_result\nLIMIT 100;">
+            Geometry as WKT (needs spatial ext)
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- Export results to CSV\nCOPY (SELECT * FROM explorer_result LIMIT 10000)\nTO '/tmp/export.csv' (FORMAT CSV, HEADER true);">
+            Export to CSV (then use Export tab)
+          </button>
+          <button class="list-group-item list-group-item-action small sample-query"
+            data-query="-- DuckDB version info\nSELECT version();">
+            DuckDB version
+          </button>
+        </div>
+      </div>
+
+      <!-- CodeMirror editor -->
+      <div id="sql-editor-wrap" class="flex-shrink-0" style="min-height:200px;max-height:45%;">
+        <textarea id="sql-editor">-- KY Overture Explorer — SQL Editor
+-- Use the sidebar to load a dataset, or write your own query below.
+-- Ctrl+Enter to run. Table name after loading: explorer_result
+
+SELECT version();</textarea>
+      </div>
+
+      <!-- SQL results -->
+      <div class="flex-grow-1 overflow-auto d-flex flex-column">
+        <div class="d-flex align-items-center gap-2 px-3 py-1 border-top flex-shrink-0">
+          <span class="small text-muted">Query Results</span>
+          <div id="sql-pagination" class="ms-auto d-flex align-items-center gap-1 d-none">
+            <button id="sql-prev-page" class="btn btn-sm btn-outline-secondary py-0">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <span id="sql-page-info" class="small text-muted px-1"></span>
+            <button id="sql-next-page" class="btn btn-sm btn-outline-secondary py-0">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div id="sql-results-wrap" class="flex-grow-1 overflow-auto">
+          <div id="sql-results-empty" class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+            <i class="bi bi-play-circle" style="font-size:2rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0 small">Run a query to see results here</p>
+          </div>
+          <div id="sql-results-error" class="d-none p-3">
+            <div class="alert alert-danger mb-0">
+              <pre id="sql-error-message" class="mb-0" style="white-space:pre-wrap;font-size:.8rem;"></pre>
+              <div id="sql-error-cors-hint" class="d-none mt-2">
+                <hr class="my-2" />
+                <p class="mb-1 small"><strong>CORS error detected.</strong> You may need to configure a proxy.</p>
+                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                  Configure Proxy
+                </button>
+              </div>
+            </div>
+          </div>
+          <table id="sql-results-table" class="table table-sm table-hover table-bordered mb-0 results-tbl d-none">
+            <thead id="sql-results-thead" class="sticky-top"></thead>
+            <tbody id="sql-results-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── MAP PREVIEW TAB ─────────────────────────────────────────────── -->
+    <div id="pane-map" class="tab-pane flex-grow-1 d-flex flex-column overflow-hidden d-none">
+      <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom flex-shrink-0">
+        <span class="small text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          Map preview requires geometry data. Load a dataset with point geometry first.
+        </span>
+        <div class="ms-auto d-flex gap-2">
+          <button id="map-render-btn" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-map me-1"></i>Render Points
+          </button>
+          <button id="map-clear-btn" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-trash me-1"></i>Clear
+          </button>
+        </div>
+        <span id="map-point-count" class="badge bg-secondary d-none"></span>
+      </div>
+      <div id="map" class="flex-grow-1"></div>
+    </div>
+
+    <!-- ── EXPORT & CONVERT TAB ────────────────────────────────────────── -->
+    <div id="pane-export" class="tab-pane flex-grow-1 d-flex flex-column overflow-hidden d-none overflow-auto">
+      <div class="p-3">
+        <div class="row g-4">
+
+          <!-- Export Results panel -->
+          <div class="col-lg-6">
+            <div class="card border h-100">
+              <div class="card-header bg-light d-flex align-items-center gap-2">
+                <i class="bi bi-box-arrow-up-right text-primary"></i>
+                <strong>Export Query Results</strong>
+              </div>
+              <div class="card-body d-flex flex-column gap-3">
+
+                <div>
+                  <label class="form-label form-label-sm">Data Source</label>
+                  <select id="export-source" class="form-select form-select-sm">
+                    <option value="explorer_result">Explorer Result (explorer_result)</option>
+                    <option value="custom">Custom SQL…</option>
+                  </select>
+                </div>
+
+                <div id="export-custom-sql-wrap" class="d-none">
+                  <label class="form-label form-label-sm">Custom SQL Query</label>
+                  <textarea id="export-custom-sql" class="form-control form-control-sm font-monospace"
+                            rows="4" placeholder="SELECT * FROM my_table WHERE …"></textarea>
+                </div>
+
+                <div>
+                  <label class="form-label form-label-sm">Export Format</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="export-format" id="fmt-parquet" value="parquet" checked />
+                      <label class="form-check-label" for="fmt-parquet">Parquet</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="export-format" id="fmt-csv" value="csv" />
+                      <label class="form-check-label" for="fmt-csv">CSV</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="export-format" id="fmt-json" value="json" />
+                      <label class="form-check-label" for="fmt-json">JSON</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="export-format" id="fmt-geojson" value="geojson" />
+                      <label class="form-check-label" for="fmt-geojson">GeoJSON</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="export-format" id="fmt-arrow" value="arrow" />
+                      <label class="form-check-label" for="fmt-arrow">Arrow IPC</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="export-csv-options" class="d-none border rounded p-2 bg-light">
+                  <label class="form-label form-label-sm">CSV Options</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="csv-header" checked />
+                    <label class="form-check-label form-label-sm" for="csv-header">Include header row</label>
+                  </div>
+                  <div class="mt-1">
+                    <label class="form-label form-label-sm">Delimiter</label>
+                    <select id="csv-delimiter" class="form-select form-select-sm" style="width:auto;">
+                      <option value=",">Comma (,)</option>
+                      <option value="	">Tab (\t)</option>
+                      <option value="|">Pipe (|)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="export-geojson-options" class="d-none border rounded p-2 bg-light">
+                  <p class="form-text small mb-1">
+                    <i class="bi bi-info-circle me-1"></i>
+                    GeoJSON export requires the Spatial extension and a <code>geometry</code> column.
+                    Non-geometry columns become feature properties.
+                  </p>
+                </div>
+
+                <div>
+                  <label class="form-label form-label-sm">Output Filename</label>
+                  <input type="text" id="export-filename" class="form-control form-control-sm"
+                         value="overture_export.parquet" />
+                </div>
+
+                <button id="export-btn" class="btn btn-primary d-flex align-items-center gap-2 justify-content-center">
+                  <i class="bi bi-download"></i>Export &amp; Download
+                </button>
+
+                <div id="export-status" class="d-none">
+                  <div class="progress mb-2" style="height:4px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+                  </div>
+                  <p id="export-status-msg" class="small text-muted text-center mb-0"></p>
+                </div>
+                <div id="export-error" class="alert alert-danger d-none small py-2"></div>
+                <div id="export-success" class="alert alert-success d-none small py-2"></div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Convert Parquet File panel -->
+          <div class="col-lg-6">
+            <div class="card border h-100">
+              <div class="card-header bg-light d-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left-right text-success"></i>
+                <strong>Convert Parquet / GeoParquet</strong>
+              </div>
+              <div class="card-body d-flex flex-column gap-3">
+
+                <div>
+                  <label class="form-label form-label-sm">Upload Parquet File</label>
+                  <input type="file" id="convert-file-input" class="form-control form-control-sm"
+                         accept=".parquet,.geoparquet" />
+                  <div class="form-text small">DuckDB-WASM reads the file locally — nothing is uploaded to a server.</div>
+                </div>
+
+                <div id="convert-file-info" class="d-none border rounded p-2 small bg-light">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-zip text-info fs-5"></i>
+                    <div>
+                      <div id="convert-file-name" class="fw-bold"></div>
+                      <div id="convert-file-size" class="text-muted"></div>
+                    </div>
+                  </div>
+                  <div id="convert-file-schema" class="mt-2"></div>
+                </div>
+
+                <div>
+                  <label class="form-label form-label-sm">Target Format</label>
+                  <select id="convert-format" class="form-select form-select-sm">
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON (newline-delimited)</option>
+                    <option value="parquet">Parquet (re-compress)</option>
+                    <option value="geojson">GeoJSON (requires geometry column)</option>
+                    <option value="arrow">Arrow IPC</option>
+                  </select>
+                </div>
+
+                <div id="convert-parquet-opts" class="d-none border rounded p-2 bg-light">
+                  <label class="form-label form-label-sm">Parquet Compression</label>
+                  <select id="convert-parquet-compression" class="form-select form-select-sm">
+                    <option value="snappy" selected>Snappy (fast, good compression)</option>
+                    <option value="zstd">Zstd (best compression)</option>
+                    <option value="gzip">Gzip</option>
+                    <option value="uncompressed">Uncompressed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label form-label-sm">Row Limit (0 = all)</label>
+                  <input type="number" id="convert-limit" class="form-control form-control-sm" value="0" min="0" />
+                </div>
+
+                <button id="convert-btn" class="btn btn-success d-flex align-items-center gap-2 justify-content-center" disabled>
+                  <i class="bi bi-arrow-repeat"></i>Convert &amp; Download
+                </button>
+
+                <div id="convert-status" class="d-none">
+                  <div class="progress mb-2" style="height:4px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated progress-bar-success w-100"></div>
+                  </div>
+                  <p id="convert-status-msg" class="small text-muted text-center mb-0"></p>
+                </div>
+                <div id="convert-error" class="alert alert-danger d-none small py-2"></div>
+                <div id="convert-success" class="alert alert-success d-none small py-2"></div>
+
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /row -->
+      </div><!-- /p-3 -->
+    </div><!-- /pane-export -->
+
+  </main>
+</div><!-- /d-flex -->
+
+<!-- ── STATUS BAR ──────────────────────────────────────────────────────── -->
+<footer class="status-bar px-3 d-flex align-items-center gap-3 border-top">
+  <span id="status-text" class="text-muted small">Ready</span>
+  <div class="ms-auto d-flex gap-3 small text-muted">
+    <span id="status-rows">0 rows loaded</span>
+    <span id="status-db">DuckDB initializing…</span>
+  </div>
+</footer>
+
+<!-- ── SETTINGS MODAL ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-gear-fill me-2"></i>Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-3" id="settings-tabs">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" data-settings-tab="about">About</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-settings-tab="duckdb">DuckDB</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-settings-tab="cors">CORS Proxy</a>
+          </li>
+        </ul>
+
+        <!-- CORS Proxy tab -->
+        <div id="settings-cors" class="settings-tab-pane d-none">
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <span class="form-label mb-0">Proxy Status</span>
+            <span id="settings-proxy-status" class="badge bg-secondary">Not configured</span>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Update Proxy URL</label>
+            <input type="url" id="settings-proxy-url" class="form-control font-monospace"
+                   placeholder="Paste new URL here to update" autocomplete="off" />
+            <div class="form-text">
+              Leave blank to keep the current proxy. URL is stored only in your browser.
+            </div>
+          </div>
+
+          <div class="mb-3 d-flex gap-2 align-items-center">
+            <button id="settings-test-proxy" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-wifi me-1"></i>Test Connection
+            </button>
+            <button id="settings-remove-proxy" class="btn btn-outline-danger btn-sm d-none">
+              <i class="bi bi-x-circle me-1"></i>Remove Proxy
+            </button>
+            <div id="settings-proxy-test-result" class="small"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Proxy URL Pattern</label>
+            <select id="settings-proxy-pattern" class="form-select">
+              <option value="path">Path-suffix: <code>{proxy}/{s3-url}</code> (recommended)</option>
+              <option value="param">Query param: <code>{proxy}?url={s3-url}</code></option>
+            </select>
+          </div>
+
+          <details class="mt-3">
+            <summary class="text-info" style="cursor:pointer;">
+              <i class="bi bi-code-slash me-1"></i>Deploy your own Cloudflare Worker (free)
+            </summary>
+            <div class="mt-2 p-3 border rounded bg-light">
+              <ol class="small mb-0">
+                <li>Install Wrangler: <code>npm install -g wrangler</code></li>
+                <li>Login: <code>wrangler login</code></li>
+                <li>From the <code>proxy/</code> folder: <code>wrangler deploy</code></li>
+                <li>Copy the deployed URL and paste it above.</li>
+              </ol>
+              <p class="small mt-2 mb-0 text-muted">
+                The worker is lightweight (~80 lines), passes Range headers, and adds CORS headers.
+                Cloudflare's free tier supports 100,000 requests/day.
+              </p>
+            </div>
+          </details>
+        </div>
+
+        <!-- DuckDB tab -->
+        <div id="settings-duckdb" class="settings-tab-pane d-none">
+          <div class="mb-3">
+            <label class="form-label">DuckDB Status</label>
+            <div id="settings-duckdb-info" class="border rounded p-2 small font-monospace">
+              <div>Status: <span id="settings-db-status">—</span></div>
+              <div>Version: <span id="settings-db-version">—</span></div>
+              <div>Spatial extension: <span id="settings-db-spatial">—</span></div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Reinitialize DuckDB</label>
+            <button id="settings-reinit-db" class="btn btn-outline-warning btn-sm ms-2">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reinitialize
+            </button>
+            <div class="form-text">Drops all loaded tables and reinitializes the database.</div>
+          </div>
+        </div>
+
+        <!-- About tab -->
+        <div id="settings-about" class="settings-tab-pane">
+          <h6>KY Overture Explorer</h6>
+          <p class="small text-muted">
+            A browser-based tool for exploring Overture Maps datasets using DuckDB-WASM.
+            Query 2.3 billion geospatial features directly from S3 — no backend required.
+          </p>
+          <p class="small">
+            Inspired by:
+            <a href="https://marchen.co/blog/browser-sql-no-backend" target="_blank">
+              SQL in the Browser: Querying 2.3 Billion Records with Zero Backend
+            </a>
+          </p>
+          <hr />
+          <h6>Stack</h6>
+          <ul class="small">
+            <li><a href="https://duckdb.org/docs/api/wasm/overview.html" target="_blank">DuckDB-WASM</a> — SQL engine in the browser</li>
+            <li><a href="https://overturemaps.org" target="_blank">Overture Maps Foundation</a> — open geospatial data</li>
+            <li><a href="https://getbootstrap.com" target="_blank">Bootstrap 5</a> — UI framework</li>
+            <li><a href="https://codemirror.net" target="_blank">CodeMirror 5</a> — SQL editor</li>
+            <li><a href="https://leafletjs.com" target="_blank">Leaflet.js</a> — map rendering</li>
+          </ul>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="settings-save-btn" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCRIPTS ────────────────────────────────────────────────────────── -->
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- CodeMirror 5 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+<!-- Leaflet -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<!-- App modules (ES modules) -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
