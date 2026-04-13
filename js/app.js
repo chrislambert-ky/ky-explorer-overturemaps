@@ -56,8 +56,9 @@ const state = {
   loadedRows:    [],
   loadedColumns: [],
   currentPage:   0,
-  map:           null,
-  mapMarkers:    null,  // Leaflet LayerGroup
+  map:             null,
+  mapMarkers:      null,  // Leaflet LayerGroup
+  pendingMapBounds: null, // [south, west, north, east] to apply on map init
 };
 
 // ── Settings persistence ──────────────────────────────────────────────────
@@ -106,7 +107,7 @@ function isCorsError(err) {
 
 // ── Tab management ────────────────────────────────────────────────────────
 
-const TABS = ['results', 'sql', 'map', 'export'];
+const TABS = ['results', 'sql', 'map', 'export', 'schema'];
 
 function switchTab(tabId) {
   TABS.forEach(id => {
@@ -165,6 +166,15 @@ function initSidebarSelects() {
 
 // ── Sidebar: bbox preset ──────────────────────────────────────────────────
 
+function zoomMapToBbox(xmin, ymin, xmax, ymax) {
+  const bounds = [[ymin, xmin], [ymax, xmax]];
+  if (state.map) {
+    state.map.fitBounds(bounds, { padding: [20, 20] });
+  } else {
+    state.pendingMapBounds = bounds;
+  }
+}
+
 function initBboxPreset() {
   document.getElementById('bbox-preset')?.addEventListener('change', e => {
     const val = e.target.value;
@@ -175,10 +185,20 @@ function initBboxPreset() {
     document.getElementById('bbox-ymin').value = ymin;
     document.getElementById('bbox-ymax').value = ymax;
     updateUrlPreview();
+    zoomMapToBbox(xmin, ymin, xmax, ymax);
   });
 
   ['bbox-xmin','bbox-xmax','bbox-ymin','bbox-ymax'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', updateUrlPreview);
+    document.getElementById(id)?.addEventListener('input', () => {
+      updateUrlPreview();
+      const xmin = parseFloat(document.getElementById('bbox-xmin')?.value);
+      const xmax = parseFloat(document.getElementById('bbox-xmax')?.value);
+      const ymin = parseFloat(document.getElementById('bbox-ymin')?.value);
+      const ymax = parseFloat(document.getElementById('bbox-ymax')?.value);
+      if (!isNaN(xmin) && !isNaN(xmax) && !isNaN(ymin) && !isNaN(ymax)) {
+        zoomMapToBbox(xmin, ymin, xmax, ymax);
+      }
+    });
   });
 }
 
@@ -192,22 +212,9 @@ function initLimitSlider() {
   });
 }
 
-// ── URL preview ───────────────────────────────────────────────────────────
+// ── URL preview (no-op: element removed) ────────────────────────────────
 
-function updateUrlPreview() {
-  const theme   = document.getElementById('theme-select')?.value;
-  const type    = document.getElementById('type-select')?.value;
-  const release = document.getElementById('release-select')?.value ?? '2026-01-21.0';
-
-  if (!theme || !type) return;
-
-  const url = buildParquetUrl(theme, type, release, state.settings.proxyUrl, state.settings.proxyPattern);
-  const el  = document.getElementById('url-preview');
-  if (el) {
-    el.textContent = url;
-    el.title       = url;
-  }
-}
+function updateUrlPreview() {}
 
 // ── Load Dataset ──────────────────────────────────────────────────────────
 
@@ -330,7 +337,7 @@ async function handleLoadDataset() {
     showCorsHint(corsHit && !state.settings.proxyUrl);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-cloud-download-fill"></i> Load Dataset';
+    btn.innerHTML = '<i class="bi bi-cloud-download-fill"></i> Fetch Dataset';
     progressWrap?.classList.add('d-none');
   }
 }
@@ -431,16 +438,19 @@ function initResultsPagination() {
 // ── Schema tree ───────────────────────────────────────────────────────────
 
 async function refreshSchemaTree() {
-  const section = document.getElementById('schema-section');
-  const tree    = document.getElementById('schema-tree');
+  const section  = document.getElementById('schema-section');
+  const emptyEl  = document.getElementById('schema-empty');
+  const tree     = document.getElementById('schema-tree');
   if (!section || !tree) return;
 
   const tables = await listTables();
   if (!tables.length) {
     section.classList.add('d-none');
+    emptyEl?.classList.remove('d-none');
     return;
   }
 
+  emptyEl?.classList.add('d-none');
   section.classList.remove('d-none');
   tree.innerHTML = '';
 
@@ -480,9 +490,17 @@ async function refreshSchemaTree() {
 function initMap() {
   if (state.map) return;
 
+  // Read bounds from whatever is currently in the bbox fields
+  const xmin = parseFloat(document.getElementById('bbox-xmin')?.value);
+  const xmax = parseFloat(document.getElementById('bbox-xmax')?.value);
+  const ymin = parseFloat(document.getElementById('bbox-ymin')?.value);
+  const ymax = parseFloat(document.getElementById('bbox-ymax')?.value);
+  const hasBbox = [xmin, xmax, ymin, ymax].every(v => !isNaN(v));
+
+  // Bootstrap the map at a neutral center; fitBounds will correct it immediately
   state.map = L.map('map', {
-    center:       [39.5, -98.35],   // US center
-    zoom:         4,
+    center:       [37.8, -85.5],
+    zoom:         7,
     preferCanvas: true,
   });
 
@@ -492,6 +510,14 @@ function initMap() {
   }).addTo(state.map);
 
   state.mapMarkers = L.layerGroup().addTo(state.map);
+
+  // Zoom to bbox fields first, then fall back to any pending preset bounds
+  if (hasBbox) {
+    state.map.fitBounds([[ymin, xmin], [ymax, xmax]], { padding: [20, 20] });
+  } else if (state.pendingMapBounds) {
+    state.map.fitBounds(state.pendingMapBounds, { padding: [20, 20] });
+  }
+  state.pendingMapBounds = null;
 }
 
 function initMapUI() {
@@ -767,12 +793,6 @@ async function main() {
 
   // Release select change → update URL preview
   document.getElementById('release-select')?.addEventListener('change', updateUrlPreview);
-
-  // URL preview click → copy to clipboard
-  document.getElementById('url-preview')?.addEventListener('click', () => {
-    const url = document.getElementById('url-preview')?.textContent;
-    if (url) navigator.clipboard.writeText(url).catch(() => {});
-  });
 
   // Load button
   document.getElementById('load-btn')?.addEventListener('click', handleLoadDataset);

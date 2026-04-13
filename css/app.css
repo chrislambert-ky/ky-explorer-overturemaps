@@ -74,23 +74,6 @@ body {
 #sidebar::-webkit-scrollbar-track { background: transparent; }
 #sidebar::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 3px; }
 
-/* ── URL preview box ─────────────────────────────────────────────────────── */
-.url-preview-box {
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: .68rem;
-  background: #e8f0fe;
-  border: 1px solid #c2d3fb;
-  border-radius: 4px;
-  padding: .35rem .5rem;
-  color: #1a56db;
-  word-break: break-all;
-  white-space: normal;
-  max-height: 56px;
-  overflow: hidden;
-  cursor: pointer;
-}
-.url-preview-box:hover { background: #d9e5fd; }
-
 /* ── Schema tree ─────────────────────────────────────────────────────────── */
 .schema-tree {
   font-size: .75rem;
