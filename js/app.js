@@ -46,7 +46,7 @@ const SETTINGS_KEY      = 'ky_overture_settings';
 
 // ── Application state ─────────────────────────────────────────────────────
 
-const DEFAULT_PROXY_URL = 'https://overture.chrslmbrt.workers.dev';
+const DEFAULT_PROXY_URL = 'https://overture.kypc.workers.dev';
 
 const state = {
   settings: {
