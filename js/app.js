@@ -221,7 +221,7 @@ function updateUrlPreview() {}
 async function handleLoadDataset() {
   const theme   = document.getElementById('theme-select')?.value;
   const type    = document.getElementById('type-select')?.value;
-  const release = document.getElementById('release-select')?.value ?? '2026-01-21.0';
+  const release = document.getElementById('release-select')?.value ?? '2026-08-19.0';
   const limit   = parseInt(document.getElementById('limit-slider')?.value ?? '10000', 10);
   const includeSpatial = document.getElementById('load-spatial')?.checked ?? true;
   const includeWkt     = document.getElementById('add-wkt')?.checked ?? false;

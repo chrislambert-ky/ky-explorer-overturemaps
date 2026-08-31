@@ -13,8 +13,8 @@
 export const S3_BASE = 'https://overturemaps-us-west-2.s3.amazonaws.com';
 
 export const RELEASES = [
-  { value: '2026-03-18.0', label: '2026-03-18.0 (Latest)' },
-  { value: '2026-02-18.0', label: '2026-02-18.0' },
+  { value: '2026-08-19.0', label: '2026-08-19.0 (Latest)' },
+  { value: '2026-07-22.0', label: '2026-07-22.0' },
 ];
 
 /**

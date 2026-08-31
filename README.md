@@ -54,7 +54,7 @@ User selects dataset
 
 Push this repository to GitHub, then enable **Pages** under *Settings → Pages → Deploy from branch → main / (root)*.
 
-The app will be live at `https://<your-username>.github.io/ky-explorer-overturemaps/`.
+The app will be live at `https://chrislambert-ky.github.io/ky-explorer-overturemaps/`.
 
 ### 2. Cloudflare Worker (CORS proxy for S3 access)
 
@@ -133,7 +133,7 @@ After loading a dataset with point geometry, click **Map Preview → Render Poin
 | addresses | address | Global address points |
 | infrastructure | infrastructure | Towers, power lines, etc. |
 
-Overture releases new snapshots roughly every 2 months. The current latest release is `2026-03-18.0`. Select the release version from the sidebar.
+Overture releases new snapshots roughly every 2 months. The current latest release is `2026-08-19.0`. Select the release version from the sidebar.
 
 ---
 
